@@ -1,37 +1,35 @@
-/* jshint esversion: 6 */
-const path = "https://api.enjoymickeybot.info";
-const { request } = require("https");
-function send(url, token) {
-    return new Promise((resolve, reject) => {
-        let req = request(encodeURI(path + url), (res) => {
-            res.setEncoding('utf8');
-            res.on('data', (data) => resolve( JSON.parse(data) ));
-        });
-
-        req.setHeader("Authorization", token);
-        req.on('error', reject);
-        req.end();
+const path = 'https://api.enjoymickeybot.info';
+const { get } = require('https');
+const send = (url, token, callback) => {
+    const req = get(encodeURI(path + url), (res) => {
+        let data = [];
+        res.on('data', data = [...data, res]);
+        res.on('end', callback(undefined, Buffer.concat(data).toString()));
     });
+
+    req.setHeader('Authorization', token);
+    req.on('error', callback('Ошибка в GET запросе', undefined));
+    req.end();
 }
 
 class EnjoyAPI {
     constructor(token) {
-        if(!token) return console.error("[EnjoyAPI] Не указан токен авторизации.");
+        if (!token) throw new Error('[EnjoyAPI] Не указан токен авторизации');
         this.token = token;
     }
 
     check(userID) {
         if(!userID) return console.error("[EnjoyAPI] Не указан ID пользователя для проверки.");
-        return new Promise((resolve) =>
-            send(`/check/${userID}`, this.token)
-                .then(res => {
-                    if(![200, 404].includes(res.code)) return resolve({ error: res });
-                    return resolve({
-                        userID: userID,
-                        active: (res.code == 200) ? true : false,
-                        reason: (res.code == 200) ? res.reason : null
-                    });
-                })
+        return new Promise((resolve, reject) =>
+            send(`/check/${userID}`, this.token, (err, res) => {
+                if(err) return reject(err);
+                if(![200, 404].includes(res.code)) return resolve({ error: res });
+                else return resolve({
+                    userID: userID,
+                    active: (res.code == 200) ? true : false,
+                    reason: (res.code == 200) ? res.reason : null
+                });
+            })
         );
     }
 }
